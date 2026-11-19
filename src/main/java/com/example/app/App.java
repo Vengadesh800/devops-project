@@ -15,7 +15,8 @@ public class App {
 
     @GetMapping("/")
     public String home() {
-        return "Welcome to AWS DevOps End-to-End Project!";
+
+        return "Welcome to AWS DevOps End-to-End Project! and my first end-to-end POC";
     }
 
     @GetMapping("/health")
