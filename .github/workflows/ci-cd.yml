@@ -1,0 +1,104 @@
+name: Complete DevOps CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+
+  build-and-deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # 1. Checkout source code
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Setup Java
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # 3. Build application
+
+      - name: Maven Build
+        run: mvn clean verify
+
+      # 4. SonarQube Analysis
+
+      - name: SonarQube Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          mvn sonar:sonar \
+          -Dsonar.projectKey=devops-app \
+          -Dsonar.host.url=$SONAR_HOST_URL \
+          -Dsonar.token=$SONAR_TOKEN
+
+      # 5. Configure AWS credentials using OIDC
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 6. Login to ECR
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 7. Build Docker image
+
+      - name: Build Docker Image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+
+      # 8. Configure Kubernetes
+
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+          --region ${{ secrets.AWS_REGION }} \
+          --name ${{ secrets.EKS_CLUSTER_NAME }}
+
+      # 9. Update Kubernetes deployment
+
+      - name: Deploy to Kubernetes
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          kubectl set image deployment/devops-app \
+          devops-container=$REGISTRY/$REPOSITORY:$IMAGE_TAG
+
+      # 10. Verify deployment
+
+      - name: Verify Deployment
+        run: |
+          kubectl rollout status deployment/devops-app
+          kubectl get pods
