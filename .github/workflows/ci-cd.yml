@@ -27,6 +27,34 @@ jobs:
       - name: Maven Build and Test
         run: mvn -B clean verify
 
+      - name: Verify SonarQube Authentication
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "ERROR: SONAR_TOKEN secret is missing"
+            exit 1
+          fi
+
+          if [ -z "$SONAR_HOST_URL" ]; then
+            echo "ERROR: SONAR_HOST_URL secret is missing"
+            exit 1
+          fi
+
+          RESPONSE=$(curl --fail --silent --show-error \
+            --connect-timeout 10 \
+            --max-time 30 \
+            -u "$SONAR_TOKEN:" \
+            "$SONAR_HOST_URL/api/authentication/validate")
+
+          if [ "$RESPONSE" = '{"valid":true}' ]; then
+            echo "SonarQube authentication successful"
+          else
+            echo "SonarQube authentication failed"
+            exit 1
+          fi
+
       - name: SonarQube Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
