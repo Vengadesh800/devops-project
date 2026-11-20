@@ -110,6 +110,34 @@ jobs:
           fi
 
           echo "AWS role ARN matches the expected role"
+                - name: Test GitHub OIDC Token
+        shell: bash
+        run: |
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || \
+             [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "ERROR: GitHub OIDC environment variables missing"
+            exit 1
+          fi
+
+          echo "OIDC environment variables available"
+
+          response=$(curl --silent --show-error --fail \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --retry 2 \
+            --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com") || {
+              echo "ERROR: Failed to retrieve GitHub OIDC token"
+              exit 1
+            }
+
+          if RESPONSE="$response" python3 -c \
+            'import json,os,sys; d=json.loads(os.environ["RESPONSE"]); sys.exit(0 if d.get("value") else 1)'; then
+            echo "SUCCESS: GitHub OIDC token retrieved"
+          else
+            echo "ERROR: GitHub OIDC response did not contain a token"
+            exit 1
+          fi
 
       - name: Configure AWS Credentials
         if: github.event_name == 'push'
