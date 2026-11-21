@@ -33,27 +33,30 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        shell: bash
         run: |
           if [ -z "$SONAR_TOKEN" ]; then
-            echo "ERROR: SONAR_TOKEN secret is missing"
+            echo "ERROR: SONAR_TOKEN is missing"
             exit 1
           fi
 
           if [ -z "$SONAR_HOST_URL" ]; then
-            echo "ERROR: SONAR_HOST_URL secret is missing"
+            echo "ERROR: SONAR_HOST_URL is missing"
             exit 1
           fi
 
-          RESPONSE=$(curl --fail --silent --show-error \
+          echo "Checking SonarQube authentication..."
+
+          RESPONSE=$(curl -sS \
             --connect-timeout 10 \
             --max-time 30 \
             -u "$SONAR_TOKEN:" \
             "$SONAR_HOST_URL/api/authentication/validate")
 
-          if [ "$RESPONSE" = '{"valid":true}' ]; then
-            echo "SonarQube authentication successful"
+          if echo "$RESPONSE" | grep -q '"valid":true'; then
+            echo "SUCCESS: SonarQube authentication verified"
           else
-            echo "SonarQube authentication failed"
+            echo "ERROR: SonarQube authentication failed"
             exit 1
           fi
 
