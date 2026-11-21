@@ -111,8 +111,9 @@ jobs:
             exit 1
           fi
 
-          echo "AWS role ARN matches the expected role"
-                - name: Test GitHub OIDC Token
+            echo "AWS role ARN matches the expected role"
+
+      - name: Test GitHub OIDC Token
         shell: bash
         run: |
           if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || \
@@ -122,6 +123,7 @@ jobs:
           fi
 
           echo "OIDC environment variables available"
+
 
           response=$(curl --silent --show-error --fail \
             --connect-timeout 10 \
